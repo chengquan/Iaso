@@ -30,7 +30,7 @@ HeloosReg = 0x00000
 MODE_REG = 20
 # bit0 ->  1:dvp frame    0: edge frame
 # bit1 ->  1:dvp clk on   0: dvp clk off
-# bit2 ->  1:jls clk on   0: jls clk off
+# bit2 ->  1:locoi clk on 0: locoi clk off
 # bit3 ->  1:edge clk on  0: edge clk off
 # bit4 ->  1:tile clk on  0: tile clk off
 # bit5 ->  1:pos X on     0: pos X off
