@@ -5,23 +5,6 @@ import micropython
 import utime
 import clock_set as clockgen
 # 从原始代码中复制的常量定义
-head1_0 = 4
-head1_1 = 5
-head1_2 = 6
-head1_3 = 7
-head1_4 = 8
-head1_5 = 9
-head1_6 = 10
-head1_7 = 11
-head1_8 = 12
-head1_9 = 13
-head2_0 = 14
-head2_1 = 15
-head2_2 = 16
-head2_3 = 17
-head2_4 = 18
-head2_5 = 19
-
 pixelX = 55
 pixelY = 63
 
@@ -344,7 +327,7 @@ class Iaso:
     def iaso_ModelSet(self, 
                     dvp_frame=None,    # bit0: 1=dvp frame, 0=edge frame
                     dvp_clk=None,      # bit1: 1=dvp clk on, 0=off
-                    jls_clk=None,      # bit2: 1=jls clk on, 0=off
+                    locoi_clk=None,      # bit2: 1=jls clk on, 0=off
                     edge_clk=None,     # bit3: 1=edge clk on, 0=off
                     tile_clk=None,    # bit4: 1=tile clk on, 0=off
                     pos_x=None,       # bit5: 1=pos X on, 0=off
@@ -367,8 +350,8 @@ class Iaso:
             current = (current & ~0x01) | (1 if dvp_frame else 0)
         if dvp_clk is not None:
             current = (current & ~0x02) | ((1 if dvp_clk else 0) << 1)
-        if jls_clk is not None:
-            current = (current & ~0x04) | ((1 if jls_clk else 0) << 2)
+        if locoi_clk is not None:
+            current = (current & ~0x04) | ((1 if locoi_clk else 0) << 2)
         if edge_clk is not None:
             current = (current & ~0x08) | ((1 if edge_clk else 0) << 3)
         if tile_clk is not None:
@@ -398,7 +381,7 @@ class Iaso:
             5: ("pos_x",    "Position X enable"),
             4: ("tile_clk", "Tile clock enable"),
             3: ("edge_clk", "Edge clock enable"),
-            2: ("jls_clk",  "JLS clock enable"),
+            2: ("locoi_clk",  "LOCO-I clock enable"),
             1: ("dvp_clk",  "DVP clock enable"),
             0: ("dvp_frame","Frame type (0=Edge 1=DVP)")
         }
@@ -566,99 +549,6 @@ def config_interrupt(pin_num=2):
     pin = machine.Pin(pin_num, machine.Pin.IN)
     pin.irq(handler=handle_interrupt, trigger=machine.Pin.IRQ_FALLING)
 
-# ====================== 功能函数 ======================
-def check_io_init():
-    pins = [
-        head1_0, head1_1, head1_2, head1_3, head1_4, head1_5,
-        head1_6, head1_7, head1_8, head1_9, head2_0, head2_1,
-        head2_2, head2_3, head2_4, head2_5
-    ]
-    for pin in pins:
-        machine.Pin(pin, machine.Pin.IN)
-
-def check_max_value():
-    pins = [
-        (head1_0, "head1_0"), (head1_1, "head1_1"), (head1_2, "head1_2"),
-        (head1_3, "head1_3"), (head1_4, "head1_4"), (head1_5, "head1_5"),
-        (head1_6, "head1_6"), (head1_7, "head1_7"), (head1_8, "head1_8"),
-        (head1_9, "head1_9"), (head2_0, "head2_0"), (head2_1, "head2_1"),
-        (head2_2, "head2_2"), (head2_3, "head2_3"), (head2_4, "head2_4"),
-        (head2_5, "head2_5")
-    ]
-    
-    for pin_num, name in pins:
-        if machine.Pin(pin_num, machine.Pin.IN).value():
-            print(name)
-
-def program_all_synapses():
-    for i in range(614):
-        myIaso.iaso_MemWr(i, 0xA5)
-
-def verify_all_synapses():
-    for i in range(614):
-        val = myIaso.iaso_MemRd(i)
-        if val != 0xA5:
-            print(f"Error at {i} is {hex(val)}")
-    print("verify weight done")
-
-def bubble_sort(arr):
-    n = len(arr)
-    for i in range(n-1):
-        for j in range(0, n-i-1):
-            if arr[j] > arr[j+1]:
-                arr[j], arr[j+1] = arr[j+1], arr[j]
-
-def Get_Image73x73():
-    for y in range(1):
-        for x in range(1):
-            myIaso.iaso_PixOutput(x, y)
-            time.sleep_ms(6000)
-            config_interrupt(2)
-            while not pixel_collected:
-                pass
-            print(interrupt_time_difference, end=' ')
-            pixel_collected = False
-        print()
-    print("over")
-
-def Get_Image32x32():
-    mean_avg = [0] * 3
-    cnt = 0
-    
-    for y in range(73):
-        for x in range(73):
-            myIaso.iaso_PixOutput(x, y)
-            time.sleep_ms(1)  # 原delay(1000)约1ms
-            
-            for time_idx in range(3):
-                for _ in range(2):
-                    config_interrupt(2)
-                    event_occurred = False
-                    start_time = time.ticks_ms()
-                    while not event_act:
-                        cnt += 1
-                        if cnt >= 1000000:  # 原3000000
-                            break
-                        # 添加超时检查
-                        if time.ticks_diff(time.ticks_ms(), start_time) > 100:
-                            break
-                    event_act = False
-                
-                if cnt >= 1000000:
-                    mean_avg[time_idx] = 99999999
-                else:
-                    mean_avg[time_idx] = interrupt_time_difference
-                cnt = 0
-            
-            # 排序取中值
-            temp = sorted(mean_avg)
-            median = temp[1]  # 三个值取中间
-            
-            if median == 0:
-                median = 1  # 避免除零
-            freq = 2000000000 // median  # 原代码计算频率的方式
-            print(freq, end=' ')
-        print("over")
 
 # ====================== 主程序 ======================
 # 初始化Iaso (使用原始引脚定义)
@@ -694,7 +584,7 @@ def setup():
     myIaso.iaso_ModelSet( 
                  dvp_frame=True,    # bit0: 1=dvp frame, 0=edge frame
                  dvp_clk=True,      # bit1: 1=dvp clk on, 0=off
-                 jls_clk=False,      # bit2: 1=jls clk on, 0=off
+                 locoi_clk=False,      # bit2: 1=locoi clk on, 0=off
                  edge_clk=False,     # bit3: 1=edge clk on, 0=off
                  tile_clk=False,    # bit4: 1=tile clk on, 0=off
                  pos_x=False,       # bit5: 1=pos X on, 0=off
